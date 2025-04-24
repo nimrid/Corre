@@ -4,7 +4,10 @@ import { useSolanaWallets } from '@privy-io/react-auth/solana';
 import { Connection, PublicKey } from '@solana/web3.js';
 
 // Solana RPC and token mints
-const connection = new Connection('https://api.mainnet-beta.solana.com');
+const connection = new Connection(
+  process.env.REACT_APP_SOLANA_RPC_URL ||
+  'https://mainnet.helius-rpc.com/?api-key=de2473a2-59dd-4eb0-944a-2380a062be24'
+);
 const TOKEN_PROGRAM_ID = new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA');
 const USDC_MINT = new PublicKey('EPjFWdd5AufqSSqeM2qZFYPiHgBee4jZqxF1vXZZ2VX');
 const USDT_MINT = new PublicKey('Es9vMFrzaCERBbMERCj2t5Ju6u2RZkMnDNtDG8oYPka');
@@ -33,7 +36,8 @@ export function useWallet() {
   // Ensure Solana wallet is created when user is authenticated
   useEffect(() => {
     const setupWallet = async () => {
-      if (authenticated && user && !wallet) {
+      // Only create if authenticated, user exists, and no existing embedded wallet
+      if (authenticated && user && solanaWallets.length === 0) {
         try {
           setIsLoading(true);
           setError(null);
@@ -46,16 +50,13 @@ export function useWallet() {
           }
           
           await createSolanaWallet();
-          console.log('Solana wallet created successfully');
         } catch (err) {
-          console.error('Failed to create Solana wallet:', err);
-
-          // If embedded wallet already exists, suppress error
+          // Suppress already-existing wallet errors
           if (err.message && err.message.includes('User already has an embedded wallet')) {
-            console.log('Embedded wallet already exists, ignoring error.');
-            setError(null);
+            console.log('Embedded wallet already exists, skipping creation.');
             return;
           }
+          console.error('Failed to create Solana wallet:', err);
 
           // Provide more specific error messages
           if (err.message && err.message.includes('Buffer')) {
@@ -70,7 +71,8 @@ export function useWallet() {
     };
 
     setupWallet();
-  }, [authenticated, user, wallet, createSolanaWallet]);
+  // Run when authentication/user changes or wallets list changes
+  }, [authenticated, user, solanaWallets.length, createSolanaWallet]);
 
   useEffect(() => {
     if (wallet?.address) {

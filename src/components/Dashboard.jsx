@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useWallet } from '../hooks/useWallet';
+import { useNavigate } from 'react-router-dom';
 import PrivyLogoutButton from './PrivyLogoutButton';
 import QRCode from 'react-qr-code';
 import { encodeURL } from '@solana/pay';
@@ -10,6 +11,11 @@ function Dashboard() {
   const [showReceiveModal, setShowReceiveModal] = useState(false);
   const { user, error: authError } = useAuth();
   const { wallet, balances, isLoading, error: walletError } = useWallet();
+  const navigate = useNavigate();
+  const [savingBalance, setSavingBalance] = useState(null);
+  const [savingLoading, setSavingLoading] = useState(true);
+  const [savingError, setSavingError] = useState(null);
+
   const errorRaw = authError || walletError;
   const error = errorRaw === 'Failed to create wallet. Please try again.' ? null : errorRaw;
 
@@ -20,6 +26,38 @@ function Dashboard() {
   const receiveUrl = wallet?.address
     ? encodeURL({ recipient: new SolanaPublicKey(wallet.address) }).toString()
     : '';
+
+  useEffect(() => {
+    if (!wallet?.address) return;
+    setSavingLoading(true);
+    setSavingError(null);
+    const options = {
+      method: 'GET',
+      headers: {
+        'x-api-key': 'f0e24b78-5e9f-4670-a022-482e4536b3d5',
+        'Content-Type': 'application/json',
+      },
+    };
+    fetch(`https://api.lulo.fi/v1/account.getAccount?owner=${wallet.address}`, options)
+      .then((response) => response.json())
+      .then((data) => {
+        setSavingBalance(data.totalBalance ?? 0);
+        setSavingLoading(false);
+      })
+      .catch((err) => {
+        console.error('Savings fetch error:', err);
+        setSavingError(err.message);
+        setSavingLoading(false);
+      });
+  }, [wallet?.address]);
+
+  if (!wallet?.address) {
+    return (
+      <div className="dashboard">
+        <p>Loading wallet...</p>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -78,16 +116,22 @@ function Dashboard() {
                 <h3>USDT</h3>
                 <p className="balance">{isLoading ? '...' : balances.USDT}</p>
               </div>
+              {/* Lulo savings balance */}
+              <div className="balance-card">
+                <h3>Savings</h3>
+                <p className="balance">{savingLoading ? '...' : savingBalance}</p>
+              </div>
             </div>
+            {savingError && <div className="error-message">Error: {savingError}</div>}
           </section>
 
           <section className="actions-section">
             <h2>Quick Actions</h2>
             <div className="action-buttons">
-              <button className="action-btn">Create Invoice</button>
+              <button className="action-btn" onClick={() => navigate('/invoice')}>Create Invoice</button>
               <button className="action-btn">Send</button>
               <button className="action-btn" onClick={() => setShowReceiveModal(true)}>Receive</button>
-              <button className="action-btn">Save</button>
+              <button className="action-btn" onClick={() => window.location.href = '/pools'}>Save</button>
             </div>
           </section>
         </main>

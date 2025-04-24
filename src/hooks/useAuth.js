@@ -15,7 +15,8 @@ export function useAuth() {
 
   // Ensure a Solana wallet exists for the user
   const ensureWallet = async () => {
-    if (!wallet && user) {
+    // Only create if authenticated, user exists, and no existing embedded wallet
+    if (authenticated && user && solanaWallets.length === 0) {
       try {
         if (typeof window !== 'undefined' && !window.Buffer) {
           console.error('Buffer is not defined. Make sure polyfills are loaded.');
@@ -26,12 +27,13 @@ export function useAuth() {
         console.log('Solana wallet created successfully');
         setError(null);
       } catch (err) {
-        console.error('Failed to create Solana wallet:', err);
-        if (solanaWallets && solanaWallets.length > 0) {
-          console.log('Wallet exists after error, suppressing error message.');
+        // Suppress already-existing wallet error
+        if (err.message && err.message.includes('User already has an embedded wallet')) {
+          console.log('Embedded wallet already exists, skipping creation.');
           setError(null);
           return;
         }
+        console.error('Failed to create Solana wallet:', err);
         if (err.message && err.message.includes('Buffer')) {
           setError('Wallet creation failed: Missing required polyfills. Please refresh the page.');
         } else if (err.name === 'TimeoutError' || err.message?.includes('timeout')) {
@@ -51,7 +53,7 @@ export function useAuth() {
   // When authenticated and user exists, ensure wallet is created
   useEffect(() => {
     if (authenticated && user) ensureWallet();
-  }, [authenticated, user]);
+  }, [authenticated, user, solanaWallets.length]);
 
   // Login handler
   const handleLogin = async () => {
