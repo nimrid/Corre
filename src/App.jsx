@@ -5,6 +5,8 @@ import LandingPage from './components/LandingPage';
 import Dashboard from './components/Dashboard';
 import Pools from './components/Pools';
 import InvoiceForm from './components/InvoiceForm';
+import Send from './components/Send';
+import SendWallet from './components/SendWallet';
 import './styles.css';
 
 const PRIVY_APP_ID = 'cm9jlcquu02arle0mt3abqs5e';
@@ -36,6 +38,8 @@ function App() {
           <Route path="/" element={<LandingPage />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/invoice" element={<InvoiceForm />} />
+          <Route path="/send" element={<Send />} />
+          <Route path="/send/wallet" element={<SendWallet />} />
           <Route path="/pools" element={<Pools />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

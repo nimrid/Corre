@@ -129,7 +129,7 @@ function Dashboard() {
             <h2>Quick Actions</h2>
             <div className="action-buttons">
               <button className="action-btn" onClick={() => navigate('/invoice')}>Create Invoice</button>
-              <button className="action-btn">Send</button>
+              <button className="action-btn" onClick={() => navigate('/send')}>Send</button>
               <button className="action-btn" onClick={() => setShowReceiveModal(true)}>Receive</button>
               <button className="action-btn" onClick={() => window.location.href = '/pools'}>Save</button>
             </div>
