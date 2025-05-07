@@ -74,7 +74,7 @@ function Dashboard() {
       <div className="dashboard">
         <header className="dashboard-header">
           <div className="logo">
-            <h1>noone</h1>
+            <h1>Corre</h1>
           </div>
           <PrivyLogoutButton className="logout-btn">
             LOGOUT
@@ -128,7 +128,7 @@ function Dashboard() {
           <section className="actions-section">
             <h2>Quick Actions</h2>
             <div className="action-buttons">
-              <button className="action-btn" onClick={() => navigate('/invoice')}>Create Invoice</button>
+              <button className="action-btn" onClick={() => navigate('/manageclients')}>Manage Client</button>
               <button className="action-btn" onClick={() => navigate('/send')}>Send</button>
               <button className="action-btn" onClick={() => setShowReceiveModal(true)}>Receive</button>
               <button className="action-btn" onClick={() => window.location.href = '/pools'}>Save</button>

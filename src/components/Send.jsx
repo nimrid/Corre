@@ -20,14 +20,13 @@ function Send() {
         <button className="action-btn send-method-btn" onClick={() => setSelected('mobile')}>
           <span role="img" aria-label="mobile" style={{marginRight: '0.6em'}}>📱</span>Send to Mobile Money
         </button>
-        <button className="action-btn send-method-btn" onClick={() => setSelected('bank')}>
+        <button className="action-btn send-method-btn" onClick={() => navigate('/send/bank')}>
           <span role="img" aria-label="bank" style={{marginRight: '0.6em'}}>🏦</span>Send to Bank Transfer
         </button>
       </div>
       <div className="send-method-content">
         {selected === 'wallet' && <div className="method-ui">Wallet Address send UI coming soon...</div>}
         {selected === 'mobile' && <div className="method-ui">Mobile Money send UI coming soon...</div>}
-        {selected === 'bank' && <div className="method-ui">Bank Transfer send UI coming soon...</div>}
       </div>
     </div>
   );

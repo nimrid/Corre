@@ -3,10 +3,12 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { PrivyProvider } from '@privy-io/react-auth';
 import LandingPage from './components/LandingPage';
 import Dashboard from './components/Dashboard';
-import Pools from './components/Pools';
 import InvoiceForm from './components/InvoiceForm';
+import Pools from './components/Pools';
 import Send from './components/Send';
 import SendWallet from './components/SendWallet';
+import ManageClients from './components/ManageClients';
+import SendBank from './components/SendBank'; // Added import statement
 import './styles.css';
 
 const PRIVY_APP_ID = 'cm9jlcquu02arle0mt3abqs5e';
@@ -37,9 +39,10 @@ function App() {
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/invoice" element={<InvoiceForm />} />
+          <Route path="/manageclients" element={<ManageClients />} />
           <Route path="/send" element={<Send />} />
           <Route path="/send/wallet" element={<SendWallet />} />
+          <Route path="/send/bank" element={<SendBank />} /> // Added route
           <Route path="/pools" element={<Pools />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

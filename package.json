@@ -23,6 +23,7 @@
     "vite": "^5.4.18"
   },
   "dependencies": {
+    "@civic/auth-web3": "^0.5.7",
     "@coral-xyz/anchor": "^0.31.1",
     "@perena/numeraire-sdk": "^1.0.9",
     "@privy-io/react-auth": "^2.10.0",
