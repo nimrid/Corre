@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useWallet } from '../hooks/useWallet';
-import { usePrivy } from '@privy-io/react-auth';
+import { useAuth } from '../hooks/useAuth';
 import '../styles/send.css';
 import { Connection, PublicKey, Transaction } from '@solana/web3.js';
 import { getAssociatedTokenAddress, createTransferInstruction } from '@solana/spl-token';
@@ -13,21 +13,39 @@ const BASE_URL = 'https://api-staging.paj.cash';
 // Solana setup
 const connection = new Connection(
   process.env.REACT_APP_SOLANA_RPC_URL ||
-    'https://mainnet.helius-rpc.com/?api-key=de2473a2-59dd-4eb0-944a-2380a062be24'
+    'https://mainnet.helius-rpc.com/?api-key=fa1fa628-f674-4fa6-8b63-6f9b85c18166'
 );
 const TOKEN_PROGRAM_ID = new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA');
-const USDC_MINT = new PublicKey('EPjFWdd5AufqSSqeM2qZFYPiHgBee4jZqxF1vXZZ2VX');
+const USDC_MINT = new PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
+
+// TTL (1 hour) storage helpers
+const TTL_MS = 3600000;
+function setWithExpiry(key, value) {
+  const item = { value, expiry: Date.now() + TTL_MS };
+  localStorage.setItem(key, JSON.stringify(item));
+}
+function getWithExpiry(key) {
+  const itemStr = localStorage.getItem(key);
+  if (!itemStr) return null;
+  try {
+    const item = JSON.parse(itemStr);
+    if (Date.now() > item.expiry) {
+      localStorage.removeItem(key);
+      return null;
+    }
+    return item.value;
+  } catch {
+    localStorage.removeItem(key);
+    return null;
+  }
+}
 
 function SendBank() {
   const navigate = useNavigate();
   const { wallet, balances, isLoading: walletLoading, error: walletError } = useWallet();
-  const { client, user } = usePrivy();
+  const { email } = useAuth();
   const [amount, setAmount] = useState('');
-  // Load stored bank accounts
-  const [bankAccounts, setBankAccounts] = useState(() => {
-    const stored = localStorage.getItem('bankAccounts');
-    return stored ? JSON.parse(stored) : [];
-  });
+  const [bankAccounts, setBankAccounts] = useState([]);
   const [selectedAccount, setSelectedAccount] = useState('');
   const [banksList, setBanksList] = useState([]);
   const [newBankId, setNewBankId] = useState('');
@@ -42,42 +60,29 @@ function SendBank() {
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showRateDialog, setShowRateDialog] = useState(false); // Added showRateDialog state
 
-  // Fetch user bank accounts from PAJ API (with session initiation)
-  useEffect(() => {
-    const fetchUserBankAccounts = async () => {
-      try {
-        // Always initiate and verify session to get a fresh session token
-        let email = user?.email || user?.identity?.email || user?.attributes?.email || user?.emailAddress || '';
-        email = String(email);
-        if (!email) return;
-        await fetch(`${BASE_URL}/pub/initiate`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email }),
-        });
-        const verifyRes = await fetch(`${BASE_URL}/pub/verify`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, otp: 1234 }),
-        });
-        if (!verifyRes.ok) throw new Error('Session verification failed');
-        const { token: sessionToken } = await verifyRes.json();
-        localStorage.setItem('session_token', sessionToken);
-        // Now fetch bank accounts
-        const res = await fetch(`${BASE_URL}/pub/bankaccount`, {
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sessionToken}` },
-        });
-        if (!res.ok) throw new Error('Failed to fetch bank accounts');
-        const data = await res.json();
-        const list = data.accounts || data.data || data.bankAccounts || data;
-        setBankAccounts(list);
-        localStorage.setItem('bankAccounts', JSON.stringify(list));
-      } catch (err) {
-        console.error('Fetch bank accounts error:', err);
-      }
-    };
-    fetchUserBankAccounts();
-  }, [user]);
+  // Fetch user bank accounts from PAJ API
+  const fetchUserBankAccounts = async () => {
+    try {
+      if (!email) return;
+      const initRes = await fetch(`${BASE_URL}/pub/initiate`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({email}) });
+      if (!initRes.ok) throw new Error('Session initiation failed');
+      const verifyRes = await fetch(`${BASE_URL}/pub/verify`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ email, otp: '1234' }) });
+      if (!verifyRes.ok) throw new Error('Session verification failed');
+      const { token: sessionToken } = await verifyRes.json();
+      setWithExpiry('session_token', sessionToken);
+      const res = await fetch(`${BASE_URL}/pub/bankaccount`, { headers: {'Content-Type':'application/json', Authorization:`Bearer ${sessionToken}`} });
+      if (!res.ok) throw new Error('Failed to fetch bank accounts');
+      const data = await res.json();
+      const list = data.accounts || data.data || data.bankAccounts || data;
+      setBankAccounts(list);
+      setWithExpiry('bankAccounts', list);
+    } catch (err) {
+      console.error('Fetch bank accounts error:', err);
+    }
+  };
+
+  // Auto-fetch bank accounts on user change
+  useEffect(() => { if (email) fetchUserBankAccounts(); }, [email]);
 
   // Load banks list from localStorage if available
   useEffect(() => {
@@ -111,24 +116,6 @@ function SendBank() {
     };
     fetchBanks();
   }, []);
-
-  // Initiate PAJ session with user email
-  useEffect(() => {
-    if (!user?.email) return;
-    const initiateSession = async () => {
-      try {
-        const token = await client.getAccessToken();
-        await fetch(`${BASE_URL}/pub/initiate`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ email: user.email }),
-        });
-      } catch (err) {
-        console.error('Init session error:', err);
-      }
-    };
-    initiateSession();
-  }, [user]);
 
   // Resolve account name when 10-digit number entered
   useEffect(() => {
@@ -165,12 +152,12 @@ function SendBank() {
       setError('Enter a valid amount');
       return;
     }
-    /*
+    
     if (amt > parseFloat(balances.USDC)) {
       setError('Amount exceeds your USDC balance');
       return;
     }
-    */
+    
    if (!selectedAccount) {
       setError('Select a bank account');
       return;
@@ -179,15 +166,15 @@ function SendBank() {
     setIsSubmitting(true);
     try {
       // 1) Generate signature (use wallet, not secret key)
-      const publicKey = user && user.address ? user.address : (wallet && wallet.address) || '';
+      const publicKey = wallet.address;
       const timestamp = new Date().toISOString();
       const payload = { publicKey, accountId: selectedAccount, timestamp };
       // Use wallet to sign the payload
       const encodedPayload = new TextEncoder().encode(JSON.stringify(payload));
       const signedPayload = await wallet.signMessage(encodedPayload, 'utf8');
       const signature = bs58.encode(signedPayload);
-      // 2) Link or retrieve PJ wallet
-      const sessionToken = localStorage.getItem('session_token');
+      // 2) Link or retrieve PAJ wallet
+      const sessionToken = getWithExpiry('session_token');
       let pajWallet = localStorage.getItem('pajWallet');
       if (!pajWallet) {
         const linkRes = await fetch(`${BASE_URL}/pub/wallet`, {
@@ -235,10 +222,7 @@ function SendBank() {
   // Add new bank account
   const handleAddAccount = async () => {
     setAddError(null);
-    console.log('Privy user object:', user);
-    const email = String(
-      (user && (user.email || user.identity?.email || user.attributes?.email || user.emailAddress)) || ''
-    );
+    // Using Civic Auth email from hook
     if (!email) {
       setAddError('Cannot find user email');
       setIsAdding(false);
@@ -254,20 +238,20 @@ function SendBank() {
       await fetch(`${BASE_URL}/pub/initiate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: String(email) }),
+        body: JSON.stringify({ email }),
       });
       // Verify session with OTP
       const verifyRes = await fetch(`${BASE_URL}/pub/verify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: String(email), otp: '1234' }),
+        body: JSON.stringify({ email, otp: '1234' }),
       });
       if (!verifyRes.ok) {
         const errData = await verifyRes.json();
         throw new Error(errData.message || 'Verification failed');
       }
       const { token: sessionToken } = await verifyRes.json();
-      localStorage.setItem('session_token', sessionToken);
+      setWithExpiry('session_token', sessionToken);
       // Add bank account using session token
       const res = await fetch(`${BASE_URL}/pub/bankAccount`, {
         method: 'POST',
@@ -275,7 +259,11 @@ function SendBank() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${sessionToken}`,
         },
-        body: JSON.stringify({ bankId: newBankId, accountNumber: newAccountNumber }),
+        body: JSON.stringify({
+          bankId: newBankId,
+          accountNumber: newAccountNumber,
+          email // always include user email for traceability
+        }),
       });
       if (!res.ok) {
         const errData = await res.json();
@@ -284,7 +272,7 @@ function SendBank() {
       const acct = await res.json();
       setBankAccounts(prev => {
         const updated = [...prev, acct];
-        localStorage.setItem('bankAccounts', JSON.stringify(updated));
+        setWithExpiry('bankAccounts', updated);
         return updated;
       });
       setNewBankId('');

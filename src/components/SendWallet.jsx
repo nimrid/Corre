@@ -1,24 +1,24 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useWallet } from '../hooks/useWallet';
-import { Connection, PublicKey, clusterApiUrl, Transaction } from '@solana/web3.js';
-import { getAssociatedTokenAddress, createTransferInstruction, getAccount, getOrCreateAssociatedTokenAccount } from '@solana/spl-token';
+import { useWalletContext } from '../context/WalletContext.jsx';
+import { Connection, PublicKey, Transaction } from '@solana/web3.js';
+import { createTransferInstruction, getAssociatedTokenAddress } from '@solana/spl-token';
 
 function SendWallet() {
-  const { wallet } = useWallet();
+  const { wallet, walletAddress } = useWalletContext();
   const navigate = useNavigate();
   const [beneficiaries, setBeneficiaries] = useState(() => {
     // Load beneficiaries from localStorage if available
     const saved = localStorage.getItem('walletBeneficiaries');
     return saved ? JSON.parse(saved) : [];
   });
-  const [walletAddress, setWalletAddress] = useState('');
+  const [recipientAddress, setRecipientAddress] = useState('');
   const [amount, setAmount] = useState('');
   const [status, setStatus] = useState('');
 
   const handleSaveBeneficiary = () => {
-    if (walletAddress && !beneficiaries.includes(walletAddress)) {
-      const updated = [...beneficiaries, walletAddress];
+    if (recipientAddress && !beneficiaries.includes(recipientAddress)) {
+      const updated = [...beneficiaries, recipientAddress];
       setBeneficiaries(updated);
       localStorage.setItem('walletBeneficiaries', JSON.stringify(updated));
       setStatus('Beneficiary saved!');
@@ -30,40 +30,24 @@ function SendWallet() {
     e.preventDefault();
     setStatus('Processing...');
     try {
-      if (!wallet || !wallet.address || !wallet.signTransaction) {
-        setStatus('Wallet not connected or missing signing capability.');
+      // Use Civic's useUser for solana.wallet
+      if (!wallet) {
+        setStatus('Wallet not connected or cannot send transactions.');
         return;
       }
-      const connection = new Connection(clusterApiUrl('devnet'), 'confirmed');
-      const sender = new PublicKey(wallet.address);
-      const recipient = new PublicKey(walletAddress);
-      const usdcMint = new PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
-      // Get sender's associated token account
-      const senderTokenAccount = await getAssociatedTokenAddress(usdcMint, sender);
-      // Get or create recipient's associated token account
-      const recipientTokenAccount = await getOrCreateAssociatedTokenAccount(connection, sender, usdcMint, recipient);
-      // Check sender's token balance
-      const senderAccountInfo = await getAccount(connection, senderTokenAccount);
-      const amountInSmallestUnit = Math.round(Number(amount) * 1e6); // USDC has 6 decimals
-      if (senderAccountInfo.amount < BigInt(amountInSmallestUnit)) {
-        setStatus('Insufficient USDC balance.');
-        return;
-      }
-      // Create transfer instruction
-      const ix = createTransferInstruction(
-        senderTokenAccount,
-        recipientTokenAccount.address,
-        sender,
-        amountInSmallestUnit
+      const connection = new Connection(
+        'https://mainnet.helius-rpc.com/?api-key=fa1fa628-f674-4fa6-8b63-6f9b85c18166',
+        'confirmed'
       );
+      const USDC_MINT = new PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
+      const fromATA = await getAssociatedTokenAddress(USDC_MINT, wallet.publicKey);
+      const toATA = await getAssociatedTokenAddress(USDC_MINT, new PublicKey(recipientAddress));
+      const amountInSmallestUnit = Math.round(Number(amount) * 1e6);
+      const ix = createTransferInstruction(fromATA, toATA, wallet.publicKey, amountInSmallestUnit);
       const tx = new Transaction().add(ix);
-      tx.feePayer = sender;
-      tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
-      // Sign and send
-      const signedTx = await wallet.signTransaction(tx);
-      const txid = await connection.sendRawTransaction(signedTx.serialize());
-      await connection.confirmTransaction(txid, 'confirmed');
-      setStatus(`Transaction sent! Tx ID: ${txid}`);
+      const signature = await wallet.sendTransaction(tx, connection);
+      await connection.confirmTransaction(signature, 'confirmed');
+      setStatus(`Transaction sent! Tx ID: ${signature}`);
       setTimeout(() => navigate('/dashboard'), 2000);
     } catch (err) {
       console.error(err);
@@ -83,18 +67,19 @@ function SendWallet() {
           <input
             type="text"
             className="wide-input"
+            style={{ padding: '1rem', fontSize: '1rem', marginBottom: '1rem' }}
             placeholder="Enter wallet address"
-            value={walletAddress}
-            onChange={e => setWalletAddress(e.target.value)}
+            value={recipientAddress}
+            onChange={e => setRecipientAddress(e.target.value)}
             required
           />
-          <button type="button" className="action-btn" style={{marginTop: '0.5em'}} onClick={handleSaveBeneficiary}>Save as Beneficiary</button>
+          <button type="button" className="action-btn" style={{marginTop: '1rem'}} onClick={handleSaveBeneficiary}>Save as Beneficiary</button>
           {beneficiaries.length > 0 && (
             <div className="beneficiaries-list">
               <h4>Saved Beneficiaries</h4>
               <ul>
                 {beneficiaries.map(addr => (
-                  <li key={addr} onClick={() => setWalletAddress(addr)} style={{cursor: 'pointer'}}>{addr}</li>
+                  <li key={addr} onClick={() => setRecipientAddress(addr)} style={{cursor: 'pointer'}}>{addr}</li>
                 ))}
               </ul>
             </div>
@@ -105,6 +90,7 @@ function SendWallet() {
           <input
             type="number"
             className="wide-input"
+            style={{ padding: '1rem', fontSize: '1rem', marginBottom: '1rem' }}
             min="0"
             step="0.01"
             placeholder="Amount (USDC)"
@@ -118,6 +104,12 @@ function SendWallet() {
         </div>
         {status && <div className="success-message">{status}</div>}
       </form>
+      {walletAddress && (
+        <div style={{ marginTop: '1rem', fontSize: '0.96em', wordBreak: 'break-all' }}>
+          <strong>Your Solana Wallet Address:</strong>
+          <pre style={{ background: '#f4f4f4', padding: '0.5em', borderRadius: '4px', marginTop: '0.2em' }}>{walletAddress}</pre>
+        </div>
+      )}
     </div>
   );
 }

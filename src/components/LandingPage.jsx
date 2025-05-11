@@ -1,20 +1,27 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import PrivyLoginButton from './PrivyLoginButton';
 
 function LandingPage() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, login, isLoading } = useAuth();
+  const navigate = useNavigate();
+  useEffect(() => {
+    if (isAuthenticated) navigate('/dashboard');
+  }, [isAuthenticated, navigate]);
 
   return (
     <main>
       <div className="noise-overlay"></div>
       <header>
         <div className="logo">
-          <h1>noone</h1>
+          <h1>Corre</h1>
         </div>
-        <PrivyLoginButton className="login-btn">
-          LOGIN
-        </PrivyLoginButton>
+        <button
+          className="login-btn"
+          onClick={login}
+        >
+          {isLoading ? 'Connecting...' : 'LOGIN'}
+        </button>
       </header>
 
       <section className="hero">
@@ -50,4 +57,4 @@ function LandingPage() {
   );
 }
 
-export default LandingPage; 
+export default LandingPage;

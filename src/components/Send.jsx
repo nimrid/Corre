@@ -20,8 +20,8 @@ function Send() {
         <button className="action-btn send-method-btn" onClick={() => setSelected('mobile')}>
           <span role="img" aria-label="mobile" style={{marginRight: '0.6em'}}>📱</span>Send to Mobile Money
         </button>
-        <button className="action-btn send-method-btn" onClick={() => navigate('/send/bank')}>
-          <span role="img" aria-label="bank" style={{marginRight: '0.6em'}}>🏦</span>Send to Bank Transfer
+        <button className="action-btn send-method-btn" onClick={() => navigate('/transfer')}>
+          <span role="img" aria-label="transfer" style={{marginRight: '0.6em'}}>💸</span>Send to Bank
         </button>
       </div>
       <div className="send-method-content">

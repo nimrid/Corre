@@ -109,7 +109,7 @@ function Dashboard() {
             <h2>Balances</h2>
             <div className="balance-cards">
               <div className="balance-card">
-                <h3>USDC</h3>
+                <h3>USDC (Native)</h3>
                 <p className="balance">{isLoading ? '...' : balances.USDC}</p>
               </div>
               <div className="balance-card">
