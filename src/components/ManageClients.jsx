@@ -2,10 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useWallet } from '../hooks/useWallet';
 import QRCode from 'react-qr-code';
+import { jsPDF } from 'jspdf';
+import { useAuth } from '../hooks/useAuth';
+import emailjs from 'emailjs-com';
 
 function ManageClients() {
   const navigate = useNavigate();
   const { wallet } = useWallet();
+  const { user } = useAuth();
 
   const [clients, setClients] = useState(() => {
     const stored = localStorage.getItem('clients');
@@ -65,10 +69,87 @@ function ManageClients() {
     setInvoices(invoices.filter(inv => inv.id !== id));
   };
 
-  const handleSendInvoice = () => {
+  const handleSendInvoice = async () => {
     const updated = { ...invoiceForm, status: 'paid' };
     setInvoices(invoices.map(inv => inv.id === updated.id ? updated : inv));
     setInvoiceForm(updated);
+
+    const doc = new jsPDF();
+    doc.setFontSize(18);
+    doc.text('Invoice', 10, 15);
+    doc.setFontSize(12);
+    doc.text(`From: ${user?.name || 'Corre User'}`, 10, 25);
+    doc.text(`To: ${selectedClient.name} (${selectedClient.email})`, 10, 32);
+    doc.text(`Due: ${invoiceForm.due}`, 10, 39);
+    doc.text(`Status: Paid`, 10, 46);
+    doc.text('Items:', 10, 55);
+    let y = 62;
+    invoiceForm.items.forEach((item, idx) => {
+      doc.text(`${idx + 1}. ${item.desc} | Qty: ${item.qty} | Price: $${item.price.toFixed(2)}`, 12, y);
+      y += 7;
+    });
+    doc.text(`Total: $${invoiceForm.items.reduce((sum, i) => sum + i.qty * i.price, 0).toFixed(2)}`, 10, y + 5);
+    // Optionally, you can export the PDF and attach it to the email if you set up EmailJS for attachments
+
+    const html = `
+      <div style='font-family:sans-serif;max-width:600px;margin:auto;'>
+        <h2 style='color:#16c784;'>Invoice</h2>
+        <p><b>From:</b> ${user?.name || 'Corre User'}</p>
+        <p><b>To:</b> ${selectedClient.name} (${selectedClient.email})</p>
+        <p><b>Due:</b> ${invoiceForm.due}</p>
+        <p><b>Status:</b> Paid</p>
+        <table style='width:100%;border-collapse:collapse;margin-top:1em;'>
+          <thead>
+            <tr style='background:#f3f4f6;'>
+              <th style='padding:8px;border:1px solid #eee;'>Description</th>
+              <th style='padding:8px;border:1px solid #eee;'>Qty</th>
+              <th style='padding:8px;border:1px solid #eee;'>Price</th>
+              <th style='padding:8px;border:1px solid #eee;'>Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${invoiceForm.items.map(item => `
+              <tr>
+                <td style='padding:8px;border:1px solid #eee;'>${item.desc}</td>
+                <td style='padding:8px;border:1px solid #eee;text-align:center;'>${item.qty}</td>
+                <td style='padding:8px;border:1px solid #eee;text-align:right;'>$${item.price.toFixed(2)}</td>
+                <td style='padding:8px;border:1px solid #eee;text-align:right;'>$${(item.qty * item.price).toFixed(2)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+        <p style='text-align:right;font-size:1.1em;margin-top:1em;'><b>Total: $${invoiceForm.items.reduce((sum, i) => sum + i.qty * i.price, 0).toFixed(2)}</b></p>
+        <p style='margin-top:2em;color:#888;'>Thank you for your business!</p>
+      </div>
+    `;
+
+    try {
+      await emailjs.send(
+        'service_jpwlq5v',
+        'template_pwjfvzd',
+        {
+          invoice_id: invoiceForm.id || 'N/A',
+          to_email: selectedClient.email,
+          from_name: user?.name || 'Corre User',
+          to_name: selectedClient.name,
+          due: invoiceForm.due,
+          status: 'Paid',
+          items_html: invoiceForm.items.map(item => `
+            <tr>
+              <td style="padding:8px;border:1px solid #eee;">${item.desc}</td>
+              <td style="padding:8px;border:1px solid #eee;text-align:center;">${item.qty}</td>
+              <td style="padding:8px;border:1px solid #eee;text-align:right;">$${item.price.toFixed(2)}</td>
+              <td style="padding:8px;border:1px solid #eee;text-align:right;">$${(item.qty * item.price).toFixed(2)}</td>
+            </tr>
+          `).join(''),
+          total: invoiceForm.items.reduce((sum, i) => sum + i.qty * i.price, 0).toFixed(2),
+        },
+        'dT2BPPE_cEQywVhQX'
+      );
+      alert('Invoice sent successfully!');
+    } catch (err) {
+      alert('Failed to send invoice email: ' + err.message);
+    }
   };
 
   return (
@@ -164,46 +245,51 @@ function ManageClients() {
       {/* Invoice Modal */}
       {showInvoiceModal && (
         <div className="modal">
-          <div className="modal-content" style={{ maxWidth: '500px', margin: 'auto', maxHeight: '80vh', overflowY: 'auto', padding: '1rem' }}>
-            <h3>{invoiceForm.id ? 'Edit Invoice' : 'Create Invoice'}</h3>
-            <div style={{ marginBottom: '1rem' }}>
-              <label>Client Name</label><br />
+          <div className="modal-content invoice-dialog" style={{ maxWidth: '500px', margin: 'auto', maxHeight: '80vh', overflowY: 'auto', padding: '1.5rem' }}>
+            <h3 style={{textAlign:'center', fontSize:'1.4em', fontWeight:700}}>{invoiceForm.id ? 'Edit Invoice' : 'Create Invoice'}</h3>
+            <div className="form-group">
+              <label>Client Name</label>
               <input type="text" value={selectedClient.name} disabled style={{ width: '100%' }} />
             </div>
-            <div style={{ marginBottom: '1rem' }}>
-              <label>Client Email</label><br />
+            <div className="form-group">
+              <label>Client Email</label>
               <input type="email" value={selectedClient.email} disabled style={{ width: '100%' }} />
             </div>
-            <div style={{ marginBottom: '1rem' }}>
-              <label>Due Date</label><br />
+            <div className="form-group">
+              <label>Due Date</label>
               <input type="date" value={invoiceForm.due} onChange={e => setInvoiceForm({ ...invoiceForm, due: e.target.value })} style={{ width: '100%' }} />
             </div>
-            <div style={{ marginBottom: '1rem' }}>
+            <div className="form-group">
               <label>Items</label>
               {invoiceForm.items.map((item, idx) => (
-                <div key={idx} style={{ display: 'flex', gap: '0.5em', marginBottom: '0.5em' }}>
-                  <input placeholder="Description" value={item.desc} onChange={e => { const its = [...invoiceForm.items]; its[idx].desc = e.target.value; setInvoiceForm({ ...invoiceForm, items: its }); }} style={{ flex: '2', padding: '0.75rem', fontSize: '1rem' }} />
-                  <input type="number" placeholder="Quantity" value={item.qty} onChange={e => { const its = [...invoiceForm.items]; its[idx].qty = Number(e.target.value); setInvoiceForm({ ...invoiceForm, items: its }); }} style={{ flex: '1', padding: '0.75rem', fontSize: '1rem' }} />
-                  <input type="number" placeholder="Price" value={item.price} onChange={e => { const its = [...invoiceForm.items]; its[idx].price = Number(e.target.value); setInvoiceForm({ ...invoiceForm, items: its }); }} style={{ flex: '0.5', padding: '0.75rem', fontSize: '1rem' }} />
-                  <button onClick={() => { const its = invoiceForm.items.filter((_, i) => i !== idx); setInvoiceForm({ ...invoiceForm, items: its }); }} style={{ background: 'none', border: 'none', fontSize: '1.25rem' }}>🗑️</button>
+                <div key={idx} className="item-row" style={{ display: 'flex', gap: '0.5em', marginBottom: '0.5em', alignItems: 'flex-end' }}>
+                  <input className="description" placeholder="Description" value={item.desc} onChange={e => { const its = [...invoiceForm.items]; its[idx].desc = e.target.value; setInvoiceForm({ ...invoiceForm, items: its }); }} style={{ flex: '2.5', padding: '0.75rem', fontSize: '1rem' }} />
+                  <div style={{display:'flex',flexDirection:'column',flex:'1',minWidth:'60px',maxWidth:'80px'}}>
+                    <label style={{fontSize:'0.85em',marginBottom:'0.2em'}}>Qty</label>
+                    <input className="quantity" type="number" min="1" placeholder="Qty" value={item.qty} onChange={e => { const its = [...invoiceForm.items]; its[idx].qty = Number(e.target.value); setInvoiceForm({ ...invoiceForm, items: its }); }} style={{ padding: '0.75rem', fontSize: '1rem' }} />
+                  </div>
+                  <div style={{display:'flex',flexDirection:'column',flex:'1',minWidth:'80px',maxWidth:'100px'}}>
+                    <label style={{fontSize:'0.85em',marginBottom:'0.2em'}}>Price</label>
+                    <input className="price" type="number" min="0" step="0.01" placeholder="Price" value={item.price} onChange={e => { const its = [...invoiceForm.items]; its[idx].price = Math.max(0, Number(e.target.value)); setInvoiceForm({ ...invoiceForm, items: its }); }} style={{ padding: '0.75rem', fontSize: '1rem' }} />
+                  </div>
+                  <button onClick={() => { const its = invoiceForm.items.filter((_, i) => i !== idx); setInvoiceForm({ ...invoiceForm, items: its }); }} style={{ background: 'none', border: 'none', fontSize: '1.25rem', alignSelf:'center' }}>🗑️</button>
                 </div>
               ))}
-              <button onClick={() => setInvoiceForm({ ...invoiceForm, items: [...invoiceForm.items, { desc: '', qty: 1, price: 0 }] })} className="action-btn">Add Item</button>
+              <button onClick={() => setInvoiceForm({ ...invoiceForm, items: [...invoiceForm.items, { desc: '', qty: 1, price: 0 }] })} className="add-item-btn" style={{ background: '#16c784', color: '#fff', border: 'none', borderRadius: '8px', padding: '0.5em 1em', fontWeight: 600, cursor: 'pointer', transition: 'background 0.2s', marginTop: '0.5em', fontSize:'1em', alignSelf:'flex-start' }}>Add Item</button>
             </div>
-            <div style={{ marginBottom: '1rem' }}>
-              <label>Total Amount Due</label><br />
-              <input type="text" value={`$${invoiceForm.items.reduce((sum, i) => sum + i.qty * i.price, 0).toFixed(2)}`} disabled style={{ width: '100%', padding: '0.75rem', fontSize: '1rem' }} />
+            <div className="form-group">
+              <label>Total Amount Due</label>
+              <input type="text" value={`$${invoiceForm.items.reduce((sum, i) => sum + i.qty * i.price, 0).toFixed(2)}`} disabled style={{ width: '100%', padding: '0.75rem', fontSize: '1.1em', fontWeight:600, background:'#f3f4f6', borderRadius:'8px', marginBottom:'1em', textAlign:'right' }} />
             </div>
-            <div style={{ marginBottom: '1rem' }}>
-              <h4>Payment</h4>
+            <div className="payment-section" style={{ textAlign: 'center', marginTop: '1.5em' }}>
+              <h4 style={{marginBottom:'0.5em'}}>Payment</h4>
               <QRCode value={wallet?.address || ''} size={80} />
-              <p style={{ wordBreak: 'break-all' }}>{wallet?.address}</p>
-              <p>Only send USDC on Solana</p>
-              
+              <div className="payment-address" style={{ fontSize: '0.95em', wordBreak: 'break-all', marginTop: '0.5em', color: '#555', background: '#f3f4f6', borderRadius: '6px', padding: '0.4em 0.6em', display: 'inline-block' }}>{wallet?.address}</div>
+              <div className="payment-note" style={{ fontSize: '0.85em', color: '#888', marginTop: '0.2em' }}>Only send USDC on Solana</div>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <button className="action-btn" onClick={handleSendInvoice} disabled={invoiceForm.status==='paid'} style={{ marginLeft: '0.5rem' }}>Send</button>
-            {invoiceForm.status==='paid' && <button className="action-btn" onClick={() => { const upd={...invoiceForm, status:'pending'}; setInvoices(invoices.map(inv => inv.id === upd.id ? upd : inv)); setInvoiceForm(upd); }}>Mark Unpaid</button>}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop:'1.5em' }}>
+              <button className="action-btn" onClick={handleSendInvoice} disabled={invoiceForm.status==='paid'} style={{ marginLeft: '0.5rem' }}>Send</button>
+              {invoiceForm.status==='paid' && <button className="action-btn" onClick={() => { const upd={...invoiceForm, status:'pending'}; setInvoices(invoices.map(inv => inv.id === upd.id ? upd : inv)); setInvoiceForm(upd); }}>Mark Unpaid</button>}
               <button className="action-btn" onClick={saveInvoice}>Save Invoice</button>
               <button className="action-btn" onClick={() => setShowInvoiceModal(false)} style={{ marginLeft: '0.5rem' }}>Cancel</button>
             </div>

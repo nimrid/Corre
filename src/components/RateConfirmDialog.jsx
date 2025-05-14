@@ -56,7 +56,7 @@ export default function RateConfirmDialog({ amount, onClose, onConfirm }) {
                   Amount you will receive: {rate?.rate?.targetCurrency}
                 </div>
                 <div style={{fontWeight:600,fontSize:'1.2em'}}>
-                  {rate?.amounts?.userAmountFiat}
+                  {rate?.amounts?.userAmountFiat !== undefined ? Number(rate.amounts.userAmountFiat).toFixed(2) : ''}
                 </div>
               </>
             )

@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { usePrivy } from '@privy-io/react-auth';
+import { useUser } from '@civic/auth-web3/react';
 
-function PrivyLoginButton({ className, children }) {
-  const { login, ready } = usePrivy();
+function CivicLoginButton({ className, children }) {
+  const { signIn, authStatus } = useUser();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -15,7 +15,7 @@ function PrivyLoginButton({ className, children }) {
       await new Promise(resolve => setTimeout(resolve, 100));
       
       // Call the login function
-      await login();
+      await signIn();
     } catch (err) {
       console.error('Login failed:', err);
       
@@ -35,7 +35,7 @@ function PrivyLoginButton({ className, children }) {
       <button 
         className={className} 
         onClick={handleLogin}
-        disabled={isLoading || !ready}
+        disabled={isLoading || authStatus === 'authenticating'}
       >
         {isLoading ? 'CONNECTING...' : children || 'LOGIN'}
       </button>
@@ -49,4 +49,4 @@ function PrivyLoginButton({ className, children }) {
   );
 }
 
-export default PrivyLoginButton; 
+export default CivicLoginButton; 

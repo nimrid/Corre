@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useWallet } from '../hooks/useWallet';
 import { useNavigate } from 'react-router-dom';
-import PrivyLogoutButton from './PrivyLogoutButton';
+import CivicLogoutButton from './CivicLogoutButton';
 import QRCode from 'react-qr-code';
 import { encodeURL } from '@solana/pay';
 import { PublicKey as SolanaPublicKey } from '@solana/web3.js';
+import { ConnectivityContext } from '../context/ConnectivityContext';
 
 function Dashboard() {
   const [showReceiveModal, setShowReceiveModal] = useState(false);
@@ -15,19 +16,21 @@ function Dashboard() {
   const [savingBalance, setSavingBalance] = useState(null);
   const [savingLoading, setSavingLoading] = useState(true);
   const [savingError, setSavingError] = useState(null);
+  const { isOnline } = useContext(ConnectivityContext);
 
   const errorRaw = authError || walletError;
   const error = errorRaw === 'Failed to create wallet. Please try again.' ? null : errorRaw;
 
   const shortAddress = wallet?.address
     ? `${wallet.address.slice(0,4)}...${wallet.address.slice(-4)}`
-    : 'Loading...';
+    : '...';
 
   const receiveUrl = wallet?.address
     ? encodeURL({ recipient: new SolanaPublicKey(wallet.address) }).toString()
     : '';
 
-  useEffect(() => {
+  // Function to fetch savings
+  const fetchSavings = () => {
     if (!wallet?.address) return;
     setSavingLoading(true);
     setSavingError(null);
@@ -49,15 +52,31 @@ function Dashboard() {
         setSavingError(err.message);
         setSavingLoading(false);
       });
+  };
+
+  // Initial fetch and on wallet address change
+  useEffect(() => {
+    fetchSavings();
   }, [wallet?.address]);
 
-  if (!wallet?.address) {
-    return (
-      <div className="dashboard">
-        <p>Loading wallet...</p>
-      </div>
-    );
-  }
+  // Refresh on focus, visibility change, or when coming back online
+  useEffect(() => {
+    function handleRefresh() {
+      fetchSavings();
+      // Optionally, trigger any wallet context refresh if available
+      // (useWallet currently auto-fetches balances on address change and polls every 15s)
+    }
+    window.addEventListener('focus', handleRefresh);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') handleRefresh();
+    });
+    // Refresh when coming back online
+    if (isOnline) handleRefresh();
+    return () => {
+      window.removeEventListener('focus', handleRefresh);
+      document.removeEventListener('visibilitychange', handleRefresh);
+    };
+  }, [wallet?.address, isOnline]);
 
   return (
     <>
@@ -76,9 +95,9 @@ function Dashboard() {
           <div className="logo">
             <h1>Corre</h1>
           </div>
-          <PrivyLogoutButton className="logout-btn">
+          <CivicLogoutButton className="logout-btn">
             LOGOUT
-          </PrivyLogoutButton>
+          </CivicLogoutButton>
         </header>
 
         {error && (
@@ -110,11 +129,11 @@ function Dashboard() {
             <div className="balance-cards">
               <div className="balance-card">
                 <h3>USDC (Native)</h3>
-                <p className="balance">{isLoading ? '...' : balances.USDC}</p>
+                <p className="balance">{balances?.USDC ?? '...'}</p>
               </div>
               <div className="balance-card">
                 <h3>USDT</h3>
-                <p className="balance">{isLoading ? '...' : balances.USDT}</p>
+                <p className="balance">{balances?.USDT ?? '...'}</p>
               </div>
               {/* Lulo savings balance */}
               <div className="balance-card">

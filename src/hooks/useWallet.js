@@ -18,12 +18,16 @@ export function useWallet() {
   const authError = userContext?.error;
   const createWalletFunc = userContext?.createWallet;
 
+  // 1. Try to load balances from localStorage first
+  const [balances, setBalances] = useState(() => {
+    const cached = localStorage.getItem('walletBalances');
+    return cached ? JSON.parse(cached) : {
+      USDC: '0.00',
+      USDT: '0.00'
+    };
+  });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [balances, setBalances] = useState({
-    USDC: '0.00',
-    USDT: '0.00'
-  });
 
   // Civic embedded wallet detection (handles USDC, USDT, SOL, etc)
   // userContext.sol is the Civic embedded Solana wallet object (not SOL the token)
@@ -46,8 +50,12 @@ export function useWallet() {
     }
   }, [authStatus, user, wallet, createWalletFunc]);
 
+  // --- Fetch and poll balances ---
   useEffect(() => {
+    let isMounted = true;
+    let pollInterval;
     if (!wallet?.address) return;
+
     const fetchBalances = async () => {
       try {
         setIsLoading(true);
@@ -55,11 +63,6 @@ export function useWallet() {
         const resp = await connection.getParsedTokenAccountsByOwner(ownerPubkey, { programId: TOKEN_PROGRAM_ID });
         let usdcAmt = 0;
         let usdtAmt = 0;
-        console.log('Token accounts found:', resp.value.map(({ account }) => ({
-          mint: account.data.parsed.info.mint,
-          amount: account.data.parsed.info.tokenAmount?.uiAmount,
-          raw: account
-        })));
         resp.value.forEach(({ account }) => {
           const info = account.data.parsed.info;
           const mint = info.mint;
@@ -67,19 +70,33 @@ export function useWallet() {
           if (mint === USDC_MINT.toBase58()) usdcAmt = amount;
           else if (mint === USDT_MINT.toBase58()) usdtAmt = amount;
         });
-        setBalances({
+        const newBalances = {
           USDC: usdcAmt.toFixed(2),
           USDT: usdtAmt.toFixed(2)
-        });
+        };
+        // Only update if changed
+        if (isMounted && JSON.stringify(newBalances) !== JSON.stringify(balances)) {
+          setBalances(newBalances);
+          localStorage.setItem('walletBalances', JSON.stringify(newBalances));
+        }
       } catch (err) {
         console.error('Failed to fetch balances:', err);
         setError('Failed to fetch balances. Please try again.');
       } finally {
-        setIsLoading(false);
+        if (isMounted) setIsLoading(false);
       }
     };
+
+    // Initial fetch
     fetchBalances();
-  }, [wallet]);
+    // Poll every 15 seconds
+    pollInterval = setInterval(fetchBalances, 15000);
+
+    return () => {
+      isMounted = false;
+      if (pollInterval) clearInterval(pollInterval);
+    };
+  }, [wallet?.address]);
 
   return {
     wallet,

@@ -7,6 +7,8 @@ import { Connection, PublicKey, Transaction } from '@solana/web3.js';
 import { getAssociatedTokenAddress, createTransferInstruction } from '@solana/spl-token';
 import bs58 from 'bs58';
 import RateConfirmDialog from './RateConfirmDialog';
+import { useUser } from '@civic/auth-web3/react';
+import nacl from 'tweetnacl'; // For optional signature verification
 
 const BASE_URL = 'https://api-staging.paj.cash';
 
@@ -40,10 +42,20 @@ function getWithExpiry(key) {
   }
 }
 
+// Optional: Helper to verify signature (for debugging, not required in production)
+function verifySignature(payload, signatureBase58, publicKeyBase58) {
+  const messageBytes = new TextEncoder().encode(JSON.stringify(payload));
+  const signature = bs58.decode(signatureBase58);
+  const publicKeyBytes = (new PublicKey(publicKeyBase58)).toBytes();
+  return nacl.sign.detached.verify(messageBytes, signature, publicKeyBytes);
+}
+
 function SendBank() {
   const navigate = useNavigate();
   const { wallet, balances, isLoading: walletLoading, error: walletError } = useWallet();
   const { email } = useAuth();
+  const userContext = useUser();
+  const civicWallet = userContext?.solana?.wallet;
   const [amount, setAmount] = useState('');
   const [bankAccounts, setBankAccounts] = useState([]);
   const [selectedAccount, setSelectedAccount] = useState('');
@@ -165,38 +177,60 @@ function SendBank() {
 
     setIsSubmitting(true);
     try {
-      // 1) Generate signature (use wallet, not secret key)
-      const publicKey = wallet.address;
+      // Use the Civic embedded wallet's publicKey (not address)
+      const publicKey = civicWallet?.publicKey?.toBase58?.() || '';
       const timestamp = new Date().toISOString();
       const payload = { publicKey, accountId: selectedAccount, timestamp };
-      // Use wallet to sign the payload
-      const encodedPayload = new TextEncoder().encode(JSON.stringify(payload));
-      const signedPayload = await wallet.signMessage(encodedPayload, 'utf8');
-      const signature = bs58.encode(signedPayload);
-      // 2) Link or retrieve PAJ wallet
-      const sessionToken = getWithExpiry('session_token');
       let pajWallet = localStorage.getItem('pajWallet');
+      // Get session token for Authorization header
+      const sessionToken = getWithExpiry('session_token');
+
       if (!pajWallet) {
-        const linkRes = await fetch(`${BASE_URL}/pub/wallet`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sessionToken}` },
-          body: JSON.stringify({ payload, signature }),
+        // First check if wallet already exists in PAJ
+        const checkWalletRes = await fetch(`${BASE_URL}/pub/wallet/${publicKey}`, {
+          headers: {
+            'Content-Type': 'application/json',
+            ...(sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {})
+          }
         });
-        if (!linkRes.ok) throw new Error('Wallet link failed');
-        pajWallet = await linkRes.json();
-        localStorage.setItem('pajWallet', JSON.stringify(pajWallet));
-      } else {
-        // retrieve existing
-        await fetch(`${BASE_URL}/pub/wallet/${publicKey}`, {
-          headers: { Authorization: `Bearer ${sessionToken}` },
-        });
+
+        if (checkWalletRes.ok) {
+          // Wallet exists, use the response
+          pajWallet = await checkWalletRes.json();
+          localStorage.setItem('pajWallet', JSON.stringify(pajWallet));
+        } else if (checkWalletRes.status === 404) {
+          // Wallet doesn't exist, proceed with adding it
+          if (!civicWallet || typeof civicWallet.signMessage !== 'function') {
+            throw new Error('Civic wallet does not support message signing. Please use a compatible wallet.');
+          }
+          const message = JSON.stringify(payload);
+          const signedMessage = await civicWallet.signMessage(Buffer.from(message, 'utf-8'));
+          const signature = bs58.encode(signedMessage);
+          
+          // Add wallet to PAJ
+          const linkRes = await fetch(`${BASE_URL}/pub/wallet`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {})
+            },
+            body: JSON.stringify({ payload, signature }),
+          });
+          if (!linkRes.ok) throw new Error('Wallet link failed');
+          pajWallet = await linkRes.json();
+          localStorage.setItem('pajWallet', JSON.stringify(pajWallet));
+        } else {
+          throw new Error('Failed to check wallet status');
+        }
       }
-      // 3) Get tx pool address
+
+      // --- USDC Transfer Logic ---
+      // 1. Get tx pool address
       const poolRes = await fetch(`${BASE_URL}/pub/txpool-address`);
       if (!poolRes.ok) throw new Error('Failed to fetch tx pool address');
       const { address: poolAddress } = await poolRes.json();
       console.log('TX Pool Address:', poolAddress);
-      // 4) Perform USDC transfer on Solana
+      // 2. Perform USDC transfer on Solana
       const userPub = new PublicKey(wallet.address);
       const poolPub = new PublicKey(poolAddress);
       // Associated token accounts
@@ -208,9 +242,14 @@ function SendBank() {
       tx.feePayer = userPub;
       const { blockhash } = await connection.getLatestBlockhash();
       tx.recentBlockhash = blockhash;
-      const signed = await wallet.signTransaction(tx);
+      const signed = await (
+        civicWallet && typeof civicWallet.signTransaction === 'function'
+          ? civicWallet.signTransaction(tx)
+          : (() => { throw new Error('Civic wallet does not support transaction signing. Please use a compatible wallet.'); })()
+      );
       const txid = await connection.sendRawTransaction(signed.serialize());
       await connection.confirmTransaction(txid, 'confirmed');
+
       navigate('/dashboard', { state: { message: `USDC sent: ${amt}, tx: ${txid}` } });
     } catch (err) {
       setError(err.message);
@@ -287,12 +326,13 @@ function SendBank() {
 
   return (
     <div className="dashboard send-form">
-      <header className="dashboard-header">
-        <div style={{textAlign:'center',margin:'2rem 0 1.5rem 0'}}>
-          <span style={{fontWeight:800,fontSize:'2.1rem',letterSpacing:'-1px',color:'#16c784',fontFamily:'Montserrat,sans-serif',textShadow:'0 2px 12px #16c78422'}}>Noone Bank</span>
+      <header className="dashboard-header" style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'2rem 2rem 1.5rem 2rem'}}>
+        <button className="action-btn" style={{margin:0}} onClick={() => navigate('/send')}>← Back</button>
+        <div style={{flex:1}}></div>
+        <div style={{display:'flex',alignItems:'center',gap:'1.2rem'}}>
+          <span style={{fontWeight:800,fontSize:'2.1rem',letterSpacing:'-1px',color:'#16c784',fontFamily:'Montserrat,sans-serif',textShadow:'0 2px 12px #16c78422'}}>Corre</span>
+          <span style={{fontWeight:700,fontSize:'1.35rem',color:'#111'}}> - Send to Bank Transfer</span>
         </div>
-        <button className="action-btn" onClick={() => navigate('/send')}>← Back</button>
-        <h2 style={{textAlign:'center',fontWeight:700,margin:'0 0 1.5rem 0'}}>Send to Bank Transfer</h2>
       </header>
       <div className="send-form-body">
         <div className="balance-info">

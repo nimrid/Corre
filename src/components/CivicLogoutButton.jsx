@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { usePrivy } from '@privy-io/react-auth';
+import { useUser } from '@civic/auth-web3/react';
 import { useNavigate } from 'react-router-dom';
 
-function PrivyLogoutButton({ className, children }) {
-  const { logout } = usePrivy();
+function CivicLogoutButton({ className, children }) {
+  const { signOut } = useUser();
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -12,7 +12,7 @@ function PrivyLogoutButton({ className, children }) {
     try {
       setIsLoading(true);
       setError(null);
-      await logout();
+      await signOut();
       navigate('/');
     } catch (err) {
       console.error('Logout failed:', err);
@@ -41,4 +41,4 @@ function PrivyLogoutButton({ className, children }) {
   );
 }
 
-export default PrivyLogoutButton; 
+export default CivicLogoutButton; 
