@@ -1,4 +1,4 @@
-# Noone - Digital Wallet for Gig Workers
+# Streamline client management, stablecoin payments collection, and earn DeFi yield
 
 A modern digital wallet application built on the Solana blockchain, specifically designed for gig workers and freelancers. The platform enables users to receive, manage, and utilize their earnings in stablecoins (USDC and USDT) with seamless integration to traditional financial systems.
 
@@ -64,17 +64,17 @@ noone/
 
 1. User clicks the login button on the landing page
 2. Civic authentication modal appears
-3. User select a social login (Google)
+3. User selects a social login (Google)
 4. Upon successful authentication, a wallet is created for the user
 5. User is redirected to the dashboard
 
 ## Exact details of what users can do
-1. Users can recieve funds using their wallet
-2. Users can perform transactions with their wallet, make sure you have little SOL
-3. Users can off-ramp to local bank, support only for Nigeria now but plans to expand to other african and LATAM countries
+1. Users can receive funds using their wallet
+2. Users can perform transactions with their wallet and make sure they have little SOL
+3. Users can off-ramp to a local bank, support only for Nigeria now, but plans to expand to other African and LATAM countries
 4. Support only stablecoins USDC, USDT
 5. Users can earn DeFi yields on stablecoins
-6. User who are freelancers can manage clients, send out invoices and collect payment via email
+6. Users who are freelancers can manage clients, send out invoices, and collect payment via email
 
 ## Contributing
 
