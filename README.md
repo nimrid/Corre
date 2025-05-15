@@ -4,7 +4,7 @@ A modern digital wallet application built on the Solana blockchain, specifically
 
 ## Features
 
-- **Authentication**: Secure login with email using Privy
+- **Authentication**: Secure login with email using Civic
 - **Wallet Management**: Multi-currency support (USDC, USDT)
 - **Payment Features**: Instant payments in stablecoins
 - **Fiat Integration**: Mobile money and bank account integration
@@ -13,7 +13,7 @@ A modern digital wallet application built on the Solana blockchain, specifically
 ## Tech Stack
 
 - **Frontend**: React, Vite
-- **Authentication**: Privy
+- **Authentication**: Civic auth web3
 - **Blockchain**: Solana
 - **Styling**: CSS with neobrutalist design
 
@@ -63,15 +63,19 @@ noone/
 ## Authentication Flow
 
 1. User clicks the login button on the landing page
-2. Privy authentication modal appears
-3. User enters their email and completes CAPTCHA verification
+2. Civic authentication modal appears
+3. User select a social login (Google)
 4. Upon successful authentication, a wallet is created for the user
 5. User is redirected to the dashboard
+
+## Exact details of what users can do
+1. Users can recieve funds using their wallet
+2. Users can perform transactions with their wallet, make sure you have little SOL
+3. Users can off-ramp to local bank, support only for Nigeria now but plans to expand to other african and LATAM countries
+4. Support only stablecoins USDC, USDT
+5. Users can earn DeFi yields on stablecoins
+6. User who are freelancers can manage clients, send out invoices and collect payment via email
 
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
-
-## License
-
-This project is licensed under the ISC License. 
