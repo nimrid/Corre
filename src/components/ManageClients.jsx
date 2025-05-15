@@ -5,6 +5,7 @@ import QRCode from 'react-qr-code';
 import { jsPDF } from 'jspdf';
 import { useAuth } from '../hooks/useAuth';
 import emailjs from 'emailjs-com';
+import { toDataURL } from 'qrcode';
 
 function ManageClients() {
   const navigate = useNavigate();
@@ -27,6 +28,8 @@ function ManageClients() {
 
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [invoiceForm, setInvoiceForm] = useState({ id: null, clientId: '', items: [{ desc: '', qty: 1, price: 0 }], due: '', notes: '', status: 'pending' });
+
+  const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
 
   useEffect(() => { localStorage.setItem('clients', JSON.stringify(clients)); }, [clients]);
   useEffect(() => { localStorage.setItem('invoices', JSON.stringify(invoices)); }, [invoices]);
@@ -70,18 +73,22 @@ function ManageClients() {
   };
 
   const handleSendInvoice = async () => {
-    const updated = { ...invoiceForm, status: 'paid' };
-    setInvoices(invoices.map(inv => inv.id === updated.id ? updated : inv));
-    setInvoiceForm(updated);
+    // Generate QR code as data URL
+    let qrDataUrl = '';
+    try {
+      qrDataUrl = await toDataURL(wallet?.address || '');
+    } catch (e) {
+      qrDataUrl = '';
+    }
 
     const doc = new jsPDF();
     doc.setFontSize(18);
     doc.text('Invoice', 10, 15);
     doc.setFontSize(12);
-    doc.text(`From: ${user?.name || 'Corre User'}`, 10, 25);
+    doc.text(`From: ${user?.name || ''}`, 10, 25);
     doc.text(`To: ${selectedClient.name} (${selectedClient.email})`, 10, 32);
     doc.text(`Due: ${invoiceForm.due}`, 10, 39);
-    doc.text(`Status: Paid`, 10, 46);
+    doc.text(`Status: ${invoiceForm.status === 'paid' ? 'Paid' : 'Pending'}`, 10, 46);
     doc.text('Items:', 10, 55);
     let y = 62;
     invoiceForm.items.forEach((item, idx) => {
@@ -94,10 +101,10 @@ function ManageClients() {
     const html = `
       <div style='font-family:sans-serif;max-width:600px;margin:auto;'>
         <h2 style='color:#16c784;'>Invoice</h2>
-        <p><b>From:</b> ${user?.name || 'Corre User'}</p>
+        <p><b>From:</b> ${user?.name || ''}</p>
         <p><b>To:</b> ${selectedClient.name} (${selectedClient.email})</p>
         <p><b>Due:</b> ${invoiceForm.due}</p>
-        <p><b>Status:</b> Paid</p>
+        <p><b>Status:</b> ${invoiceForm.status === 'paid' ? 'Paid' : 'Pending'}</p>
         <table style='width:100%;border-collapse:collapse;margin-top:1em;'>
           <thead>
             <tr style='background:#f3f4f6;'>
@@ -119,6 +126,11 @@ function ManageClients() {
           </tbody>
         </table>
         <p style='text-align:right;font-size:1.1em;margin-top:1em;'><b>Total: $${invoiceForm.items.reduce((sum, i) => sum + i.qty * i.price, 0).toFixed(2)}</b></p>
+        <div style='margin-top:2em;text-align:center;'>
+          <p style='margin-bottom:0.5em;'>Payment QR Code:</p>
+          ${qrDataUrl ? `<img src='${qrDataUrl}' alt='QR Code' style='width:120px;height:120px;' />` : ''}
+          <div style='font-size:0.95em;color:#555;margin-top:0.5em;'>${wallet?.address || ''}</div>
+        </div>
         <p style='margin-top:2em;color:#888;'>Thank you for your business!</p>
       </div>
     `;
@@ -130,10 +142,10 @@ function ManageClients() {
         {
           invoice_id: invoiceForm.id || 'N/A',
           to_email: selectedClient.email,
-          from_name: user?.name || 'Corre User',
+          from_name: user?.name || '',
           to_name: selectedClient.name,
           due: invoiceForm.due,
-          status: 'Paid',
+          status: invoiceForm.status === 'paid' ? 'Paid' : 'Pending',
           items_html: invoiceForm.items.map(item => `
             <tr>
               <td style="padding:8px;border:1px solid #eee;">${item.desc}</td>
@@ -143,12 +155,15 @@ function ManageClients() {
             </tr>
           `).join(''),
           total: invoiceForm.items.reduce((sum, i) => sum + i.qty * i.price, 0).toFixed(2),
+          qr_code: qrDataUrl,
+          payment_address: wallet?.address || '',
         },
         'dT2BPPE_cEQywVhQX'
       );
-      alert('Invoice sent successfully!');
+      setToast({ show: true, message: 'Invoice sent successfully!', type: 'success' });
+      setShowInvoiceModal(false);
     } catch (err) {
-      alert('Failed to send invoice email: ' + err.message);
+      setToast({ show: true, message: 'Failed to send invoice email: ' + err.message, type: 'error' });
     }
   };
 
@@ -198,14 +213,25 @@ function ManageClients() {
                       key={inv.id}
                       style={{ padding: '0.75rem', border: '1px solid #eee', borderRadius: '4px', marginBottom: '0.5rem' }}
                     >
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <div>
                           <strong>Invoice #{inv.id}</strong><br />
                           <small>Due: {inv.due} | Status: {inv.status} | Total: ${inv.total.toFixed(2)}</small>
                         </div>
-                        <div>
+                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                           <button className="action-btn" onClick={() => openInvoiceModal(selectedClient, inv)}>Edit</button>
-                          <button className="action-btn" onClick={() => deleteInvoice(inv.id)} style={{ marginLeft: '0.5rem' }}>Delete</button>
+                          <button className="action-btn" onClick={() => deleteInvoice(inv.id)}>Delete</button>
+                          {inv.status === 'paid' ? (
+                            <button className="action-btn" style={{ background: '#16c784', color: '#fff' }} onClick={() => {
+                              const upd = { ...inv, status: 'pending' };
+                              setInvoices(invoices.map(i => i.id === inv.id ? upd : i));
+                            }}>Mark Unpaid</button>
+                          ) : (
+                            <button className="action-btn" style={{ background: '#ffdddd', color: '#a00' }} onClick={() => {
+                              const upd = { ...inv, status: 'paid' };
+                              setInvoices(invoices.map(i => i.id === inv.id ? upd : i));
+                            }}>Mark Paid</button>
+                          )}
                         </div>
                       </div>
                     </li>
@@ -294,6 +320,29 @@ function ManageClients() {
               <button className="action-btn" onClick={() => setShowInvoiceModal(false)} style={{ marginLeft: '0.5rem' }}>Cancel</button>
             </div>
           </div>
+        </div>
+      )}
+
+      {toast.show && (
+        <div style={{
+          position: 'fixed',
+          bottom: 30,
+          right: 30,
+          background: toast.type === 'success' ? '#16c784' : '#ffdddd',
+          color: toast.type === 'success' ? '#fff' : '#a00',
+          padding: '1em 2em',
+          borderRadius: 8,
+          zIndex: 3000,
+          boxShadow: '0 2px 12px #0002',
+          minWidth: 220,
+          fontWeight: 600,
+          fontSize: '1.1em',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 16,
+        }}>
+          <span>{toast.message}</span>
+          <button onClick={() => setToast({ ...toast, show: false })} style={{marginLeft:16,background:'none',border:'none',color:'#fff',fontWeight:700,cursor:'pointer',fontSize:'1.2em'}}>×</button>
         </div>
       )}
     </div>

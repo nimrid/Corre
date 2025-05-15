@@ -370,8 +370,13 @@ function Pools() {
           <button style={{marginLeft:16,background:'none',border:'none',color:'#a00',fontWeight:700,cursor:'pointer'}} onClick={handleCloseToast}>Dismiss</button>
         </div>
       )}
-      <button className="action-btn" onClick={() => navigate('/dashboard')}>← Back</button>
-      <h1 style={{ textAlign: 'center', margin: '1em 0' }}>Pools</h1>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'2rem 2rem 1.5rem 2rem'}}>
+        <button className="action-btn" onClick={() => navigate('/dashboard')}>← Back</button>
+        <div style={{flex:1}}></div>
+        <div style={{fontWeight:800,fontSize:'2.1rem',letterSpacing:'-1px',color:'#16c784',fontFamily:'Montserrat,sans-serif',textShadow:'0 2px 12px #16c78422',textAlign:'right'}}>
+          Corre - Pools
+        </div>
+      </div>
       <h2>Pool Market Items</h2>
       {loading ? (
         <div style={{textAlign:'center',margin:'2em'}}>Loading pools...</div>
@@ -422,15 +427,15 @@ function Pools() {
           ))}
 
           {/* UseLulo overview below Perena */}
+          <div className="overview-descriptions" style={{ margin: '1em 0', padding: '1em', border: '1px solid #ccc', borderRadius: 8 }}>
+            <p><strong>Regular Pool:</strong> Standard USDC deposits earning yield; no risk protection.</p>
+            <p><strong>Protected Pool:</strong> Risk-protected deposits; losses covered by boosted pool funds in case of protocol failures.</p>
+          </div>
           <div className="overview-metrics" style={{ margin: '1em 0', padding: '1em', border: '1px solid #ccc', borderRadius: 8 }}>
             <p>Total Liquidity: {formatUSDC(metrics.totalLiquidity)}</p>
             <p>Available Liquidity: {formatUSDC(metrics.availableLiquidity)}</p>
             <p>Regular Pool Liquidity: {formatUSDC(metrics.regularLiquidityAmount)}</p>
             <p>Protected Pool Liquidity: {formatUSDC(metrics.protectedLiquidityAmount)}</p>
-          </div>
-          <div className="overview-descriptions" style={{ margin: '1em 0', padding: '1em', border: '1px solid #ccc', borderRadius: 8 }}>
-            <p><strong>Regular Pool:</strong> Standard USDC deposits earning yield; no risk protection.</p>
-            <p><strong>Protected Pool:</strong> Risk-protected deposits; losses covered by boosted pool funds in case of protocol failures.</p>
           </div>
 
           {/* Render regular and protected pools next */}
@@ -447,10 +452,18 @@ function Pools() {
                       </p>
                     );
                   }
-                  if (key === 'maxWithdrawalAmount' || key === 'openCapacity' || key === 'price') {
+                  if (key === 'maxWithdrawalAmount' || key === 'openCapacity') {
                     return (
                       <p key={key}>
                         <span className="label">{key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}: </span>
+                        {formatUSDC(value)}
+                      </p>
+                    );
+                  }
+                  if (key === 'price') {
+                    return (
+                      <p key={key}>
+                        <span className="label">Min Deposit Amount: </span>
                         {formatUSDC(value)}
                       </p>
                     );

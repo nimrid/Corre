@@ -64,16 +64,47 @@ function SendWallet() {
       <form className="form-container" onSubmit={handleSend}>
         <div className="balance-card form-section">
           <h3>Recipient Wallet Address</h3>
-          <input
-            type="text"
-            className="wide-input"
-            style={{ padding: '1rem', fontSize: '1rem', marginBottom: '1rem' }}
-            placeholder="Enter wallet address"
-            value={recipientAddress}
-            onChange={e => setRecipientAddress(e.target.value)}
-            required
-          />
-          <button type="button" className="action-btn" style={{marginTop: '1rem'}} onClick={handleSaveBeneficiary}>Save as Beneficiary</button>
+          <div
+            style={{
+              display: 'flex',
+              gap: '1.2em',
+              alignItems: 'center',
+              marginBottom: '2em',
+              flexWrap: 'wrap',
+            }}
+          >
+            <input
+              type="text"
+              placeholder="Enter wallet address"
+              value={recipientAddress}
+              onChange={e => setRecipientAddress(e.target.value)}
+              style={{
+                flex: 1,
+                minWidth: 220,
+                padding: '1.2em',
+                fontSize: '1.1em',
+                borderRadius: 8,
+                border: '1.5px solid #ccc',
+                boxSizing: 'border-box',
+                outline: 'none',
+                marginBottom: 0,
+              }}
+            />
+            <button
+              className="action-btn"
+              style={{
+                fontSize: '1.1em',
+                padding: '1.2em 2.2em',
+                marginLeft: 0,
+                marginTop: 0,
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
+              }}
+              onClick={handleSaveBeneficiary}
+            >
+              Save as Beneficiary
+            </button>
+          </div>
           {beneficiaries.length > 0 && (
             <div className="beneficiaries-list">
               <h4>Saved Beneficiaries</h4>
@@ -110,6 +141,14 @@ function SendWallet() {
           <pre style={{ background: '#f4f4f4', padding: '0.5em', borderRadius: '4px', marginTop: '0.2em' }}>{walletAddress}</pre>
         </div>
       )}
+      <style>{`
+        @media (max-width: 600px) {
+          .send-wallet-flex-row {
+            flex-direction: column !important;
+            align-items: stretch !important;
+          }
+        }
+      `}</style>
     </div>
   );
 }
