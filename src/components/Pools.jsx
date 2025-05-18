@@ -182,14 +182,17 @@ function Pools() {
       const transaction = VersionedTransaction.deserialize(
         Buffer.from(quote.transaction, 'base64')
       );
-      
+      // Debug: log required signers and civicWallet public key
+      console.log('Transaction required signers:', transaction.message.staticAccountKeys?.map(k => k.toBase58?.() || k.toString()));
+      console.log('Civic wallet public key:', civicWallet.publicKey.toBase58());
       // Convert transaction to buffer before signing
-      const messageBytes = transaction.message.serialize();
+      let messageBytes = transaction.message.serialize();
+      if (!(messageBytes instanceof Uint8Array)) {
+        messageBytes = new Uint8Array(Object.values(messageBytes));
+      }
       const signedMessage = await civicWallet.signMessage(messageBytes);
-      
-      // Add the signature to the transaction
+      // Add the signature to the transaction using the Civic wallet public key
       transaction.addSignature(civicWallet.publicKey, signedMessage);
-      
       const signedTransaction = Buffer.from(transaction.serialize()).toString('base64');
       const result = await executeJupiterSwap(signedTransaction, quote.requestId);
       await connection.confirmTransaction(result.txid, 'confirmed');
@@ -219,14 +222,15 @@ function Pools() {
       const transaction = VersionedTransaction.deserialize(
         Buffer.from(quote.transaction, 'base64')
       );
-      
-      // Convert transaction to buffer before signing
-      const messageBytes = transaction.message.serialize();
+      // Debug: log required signers and civicWallet public key
+      console.log('Transaction required signers:', transaction.message.staticAccountKeys?.map(k => k.toBase58?.() || k.toString()));
+      console.log('Civic wallet public key:', civicWallet.publicKey.toBase58());
+      let messageBytes = transaction.message.serialize();
+      if (!(messageBytes instanceof Uint8Array)) {
+        messageBytes = new Uint8Array(Object.values(messageBytes));
+      }
       const signedMessage = await civicWallet.signMessage(messageBytes);
-      
-      // Add the signature to the transaction
       transaction.addSignature(civicWallet.publicKey, signedMessage);
-      
       const signedTransaction = Buffer.from(transaction.serialize()).toString('base64');
       const result = await executeJupiterSwap(signedTransaction, quote.requestId);
       await connection.confirmTransaction(result.txid, 'confirmed');
@@ -239,14 +243,13 @@ function Pools() {
     }
   };
 
-  // Handle deposit into regular or protected pool
-  const handleDeposit = async (pool, amount) => {
-    if (!civicWallet?.publicKey) {
+  // --- UseLulo deposit/withdraw use civicWallet ---
+  const handleLuloDeposit = async (pool, amount) => {
+    if (!civicWallet?.publicKey || !civicWallet.sendTransaction) {
       setError('Please connect your wallet first');
       setShowErrorToast(true);
       return;
     }
-    
     setLoading(true);
     try {
       const options = {
@@ -261,37 +264,22 @@ function Pools() {
           mintAddress: pool.mintAddress || USDC_MINT.toBase58(),
           regularAmount: pool.type === 'regular' ? amount : 0,
           protectedAmount: pool.type === 'protected' ? amount : 0,
+          // Optionally add referrer if needed
         }),
       };
-      
       const response = await fetch('https://api.lulo.fi/v1/generate.transactions.deposit', options);
       const data = await response.json();
-      
       if (!response.ok) {
         throw new Error(data.message || 'Failed to generate deposit transaction');
       }
-      
-      // Deserialize the transaction
       const transaction = VersionedTransaction.deserialize(
         Buffer.from(data.transaction, 'base64')
       );
-      
-      // Convert transaction to buffer before signing
-      const messageBytes = transaction.message.serialize();
-      const signedMessage = await civicWallet.signMessage(messageBytes);
-      
-      // Add the signature to the transaction
-      transaction.addSignature(civicWallet.publicKey, signedMessage);
-      
-      // Send the transaction
-      const txid = await connection.sendRawTransaction(transaction.serialize());
-      
-      // Wait for confirmation
-      await connection.confirmTransaction(txid, 'confirmed');
-      
-      alert(`Successfully deposited ${amount} USDC into ${pool.type} pool. Tx ID: ${txid}`);
+      // Use Civic wallet's sendTransaction method
+      const signature = await civicWallet.sendTransaction(transaction, connection);
+      await connection.confirmTransaction(signature, 'confirmed');
+      alert(`Successfully deposited ${amount} USDC into ${pool.type} pool. Tx ID: ${signature}`);
     } catch (err) {
-      console.error('Deposit error:', err);
       setError(err.message);
       setShowErrorToast(true);
     } finally {
@@ -299,20 +287,17 @@ function Pools() {
     }
   };
 
-  // Handle withdrawal from regular or protected pool
-  const handleWithdraw = async (pool, amount) => {
+  const handleLuloWithdraw = async (pool, amount) => {
     if (!civicWallet?.publicKey) {
       setError('Please connect your wallet first');
       setShowErrorToast(true);
       return;
     }
-    
     setLoading(true);
     try {
       const endpoint = pool.type === 'protected' 
         ? 'https://api.lulo.fi/v1/generate.transactions.withdrawProtected'
         : 'https://api.lulo.fi/v1/generate.transactions.initiateRegularWithdraw';
-      
       const options = {
         method: 'POST',
         headers: {
@@ -326,35 +311,20 @@ function Pools() {
           amount: amount
         }),
       };
-      
       const response = await fetch(endpoint, options);
       const data = await response.json();
-      
       if (!response.ok) {
         throw new Error(data.message || 'Failed to generate withdrawal transaction');
       }
-      
-      // Deserialize the transaction
       const transaction = VersionedTransaction.deserialize(
         Buffer.from(data.transaction, 'base64')
       );
-      
-      // Convert transaction to buffer before signing
-      const messageBytes = transaction.message.serialize();
-      const signedMessage = await civicWallet.signMessage(messageBytes);
-      
-      // Add the signature to the transaction
-      transaction.addSignature(civicWallet.publicKey, signedMessage);
-      
-      // Send the transaction
-      const txid = await connection.sendRawTransaction(transaction.serialize());
-      
-      // Wait for confirmation
+      // Use the Civic wallet's signTransaction method
+      const signedTx = await civicWallet.signTransaction(transaction);
+      const txid = await connection.sendRawTransaction(signedTx.serialize());
       await connection.confirmTransaction(txid, 'confirmed');
-      
       alert(`Successfully initiated withdrawal of ${amount} USDC from ${pool.type} pool. Tx ID: ${txid}`);
     } catch (err) {
-      console.error('Withdrawal error:', err);
       setError(err.message);
       setShowErrorToast(true);
     } finally {
@@ -533,7 +503,7 @@ function Pools() {
                   if (selectedPool?.type === 'perena') {
                     handlePerenaDeposit(Number(depositAmount));
                   } else {
-                    handleDeposit(selectedPool, Number(depositAmount));
+                    handleLuloDeposit(selectedPool, Number(depositAmount));
                   }
                   setShowDepositModal(false); 
                 }}
@@ -585,7 +555,7 @@ function Pools() {
                   if (selectedPool?.type === 'perena') {
                     handlePerenaWithdraw(Number(withdrawalAmount));
                   } else {
-                    handleWithdraw(selectedPool, Number(withdrawalAmount));
+                    handleLuloWithdraw(selectedPool, Number(withdrawalAmount));
                   }
                   setShowWithdrawalModal(false); 
                 }}
