@@ -36,7 +36,11 @@ function LandingPage() {
           </div>
         </div>
         <div className="hero-image">
-          <img src="/assets/gighero.png" alt="Freelancer earning from gigs" style={{width: '100%', height: 'auto', borderRadius: '12px', border: '3px solid black', boxShadow: '8px 8px 0 black'}} />
+          <img 
+            src="https://hefafnsdx7xk1nzg.public.blob.vercel-storage.com/nfts/Freelancer%27s%20Carefree%20Success_simple_compose_01jv16p064ey19mxggcdgp6cv3-F0wyBKTxiBSQOa5DYGqFdxX5Z5TWpM.png" 
+            alt="Freelancer earning from gigs" 
+            style={{width: '100%', height: 'auto', borderRadius: '12px', border: '3px solid black', boxShadow: '8px 8px 0 black'}} 
+          />
         </div>
       </section>
 
