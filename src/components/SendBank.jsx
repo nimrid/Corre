@@ -9,6 +9,7 @@ import bs58 from 'bs58';
 import RateConfirmDialog from './RateConfirmDialog';
 import { useUser } from '@civic/auth-web3/react';
 import nacl from 'tweetnacl'; // For optional signature verification
+import { Buffer } from 'buffer';
 
 const BASE_URL = 'https://api-staging.paj.cash';
 
@@ -204,7 +205,7 @@ function SendBank() {
             throw new Error('Civic wallet does not support message signing. Please use a compatible wallet.');
           }
           const message = JSON.stringify(payload);
-          const signedMessage = await civicWallet.signMessage(Buffer.from(message, 'utf-8'));
+          const signedMessage = await civicWallet.signMessage(new Uint8Array(Buffer.from(message, 'utf-8')));
           const signature = bs58.encode(signedMessage);
           
           // Add wallet to PAJ
