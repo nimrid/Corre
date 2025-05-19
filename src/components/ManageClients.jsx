@@ -314,8 +314,8 @@ function ManageClients() {
               <div className="payment-note" style={{ fontSize: '0.85em', color: '#888', marginTop: '0.2em' }}>Only send USDC on Solana</div>
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop:'1.5em' }}>
-              <button className="action-btn" onClick={handleSendInvoice} disabled={invoiceForm.status==='paid'} style={{ marginLeft: '0.5rem' }}>Send</button>
-              {invoiceForm.status==='paid' && <button className="action-btn" onClick={() => { const upd={...invoiceForm, status:'pending'}; setInvoices(invoices.map(inv => inv.id === upd.id ? upd : inv)); setInvoiceForm(upd); }}>Mark Unpaid</button>}
+            <button className="action-btn" onClick={handleSendInvoice} disabled={invoiceForm.status==='paid'} style={{ marginLeft: '0.5rem' }}>Send</button>
+            {invoiceForm.status==='paid' && <button className="action-btn" onClick={() => { const upd={...invoiceForm, status:'pending'}; setInvoices(invoices.map(inv => inv.id === upd.id ? upd : inv)); setInvoiceForm(upd); }}>Mark Unpaid</button>}
               <button className="action-btn" onClick={saveInvoice}>Save Invoice</button>
               <button className="action-btn" onClick={() => setShowInvoiceModal(false)} style={{ marginLeft: '0.5rem' }}>Cancel</button>
             </div>

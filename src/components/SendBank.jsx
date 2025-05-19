@@ -323,7 +323,7 @@ function SendBank() {
       setIsAdding(false);
     }
   };
-th
+
   return (
     <div className="dashboard send-form">
       <header className="dashboard-header" style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'2rem 2rem 1.5rem 2rem'}}>

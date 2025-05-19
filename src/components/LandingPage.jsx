@@ -36,7 +36,7 @@ function LandingPage() {
           </div>
         </div>
         <div className="hero-image">
-          <img src="/assets/gig-hero.png" alt="Freelancer earning from gigs" style={{width: '100%', height: 'auto', borderRadius: '12px', border: '3px solid black', boxShadow: '8px 8px 0 black'}} />
+          <img src="/assets/gighero.png" alt="Freelancer earning from gigs" style={{width: '100%', height: 'auto', borderRadius: '12px', border: '3px solid black', boxShadow: '8px 8px 0 black'}} />
         </div>
       </section>
 

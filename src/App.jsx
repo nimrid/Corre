@@ -9,6 +9,8 @@ import Send from './components/Send';
 import SendWallet from './components/SendWallet';
 import ManageClients from './components/ManageClients';
 import SendBank from './components/SendBank';
+import PerenaPool from './components/PerenaPool';
+import LuloPools from './components/LuloPools';
 import { ConnectivityProvider } from './context/ConnectivityContext';
 import './styles.css';
 
@@ -30,6 +32,8 @@ function App() {
                     <Route path="/send/wallet" element={<SendWallet />} />
                     <Route path="/transfer" element={<SendBank />} />
                     <Route path="/pools" element={<Pools />} />
+                    <Route path="/perena" element={<PerenaPool />} />
+                    <Route path="/lulo" element={<LuloPools />} />
                     <Route path="*" element={<Navigate to="/" replace />} />
                   </Routes>
                 </WalletProvider>
