@@ -4,6 +4,7 @@ import { useWalletContext } from '../context/WalletContext';
 import { Connection, PublicKey, VersionedTransaction } from '@solana/web3.js';
 import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
 import { useUser } from '@civic/auth-web3/react';
+import bs58 from 'bs58';
 
 // Constants for Perena integration
 const connection = new Connection(
@@ -109,8 +110,9 @@ function PerenaPool() {
       const { transaction: transactionBase64, requestId } = orderData;
 
       console.log('Deserializing transaction...');
-      const transactionBuffer = Buffer.from(transactionBase64, 'base64');
-      const transaction = VersionedTransaction.deserialize(transactionBuffer);
+      // Convert base64 to Uint8Array
+      const transactionBytes = Uint8Array.from(atob(transactionBase64), c => c.charCodeAt(0));
+      const transaction = VersionedTransaction.deserialize(transactionBytes);
 
       console.log('Signing transaction...');
       console.log('Transaction required signers:', transaction.message.staticAccountKeys?.map(k => k.toBase58?.() || k.toString()));
@@ -119,7 +121,8 @@ function PerenaPool() {
       const signedTransaction = await civicWallet.signTransaction(transaction);
 
       console.log('Executing transaction...');
-      const serializedTransaction = Buffer.from(signedTransaction.serialize()).toString('base64');
+      // Convert signed transaction to base64
+      const serializedTransaction = btoa(String.fromCharCode.apply(null, signedTransaction.serialize()));
 
       const executeResponse = await fetch('https://lite-api.jup.ag/ultra/v1/execute', {
         method: 'POST',
@@ -220,8 +223,9 @@ function PerenaPool() {
       const { transaction: transactionBase64, requestId } = orderData;
 
       console.log('Deserializing transaction...');
-      const transactionBuffer = Buffer.from(transactionBase64, 'base64');
-      const transaction = VersionedTransaction.deserialize(transactionBuffer);
+      // Convert base64 to Uint8Array
+      const transactionBytes = Uint8Array.from(atob(transactionBase64), c => c.charCodeAt(0));
+      const transaction = VersionedTransaction.deserialize(transactionBytes);
 
       console.log('Signing transaction...');
       console.log('Transaction required signers:', transaction.message.staticAccountKeys?.map(k => k.toBase58?.() || k.toString()));
@@ -230,7 +234,8 @@ function PerenaPool() {
       const signedTransaction = await civicWallet.signTransaction(transaction);
 
       console.log('Executing transaction...');
-      const serializedTransaction = Buffer.from(signedTransaction.serialize()).toString('base64');
+      // Convert signed transaction to base64
+      const serializedTransaction = btoa(String.fromCharCode.apply(null, signedTransaction.serialize()));
 
       const executeResponse = await fetch('https://lite-api.jup.ag/ultra/v1/execute', {
         method: 'POST',
