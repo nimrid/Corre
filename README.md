@@ -28,8 +28,8 @@ A modern digital wallet application built on the Solana blockchain, specifically
 
 1. Clone the repository
 ```bash
-git clone https://github.com/yourusername/noone.git
-cd noone
+git clone https://github.com/nimrid/Corre.git
+cd Corre
 ```
 
 2. Install dependencies
@@ -47,7 +47,7 @@ npm run dev
 ## Project Structure
 
 ```
-noone/
+Corre/
 ├── src/
 │   ├── components/       # React components
 │   ├── hooks/            # Custom React hooks
